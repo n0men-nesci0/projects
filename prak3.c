@@ -110,11 +110,9 @@ int cmp(tree** frst, tree** scnd) {
   return (*scnd)->count - (*frst)->count;
 }
 
-void final_output(tree** arr, tree** arr_end, int count_all, FILE* f) { int i = 0;
-  for (; arr < arr_end; ++arr) {
+void final_output(tree** arr, tree** arr_end, int count_all, FILE* f) {
+  for (; arr < arr_end; ++arr)
     fprintf(f, "%s %d %f\n", (*arr)->word, (*arr)->count, (float)(*arr)->count/count_all);
-    ++i;
-  }
   return;
 }
 
