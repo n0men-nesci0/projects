@@ -59,11 +59,12 @@ char* read_word(FILE* f) { int i = 0, r = 0, c; char* str = NULL;
   return str;
 }
 
-tree* tree_init(FILE* f) {
+tree* tree_init(FILE* f) { char* str = read_word(f);
+  if (!str) exit(0);
   tree* tmp_h;
   tmp_h = malloc(sizeof(tree));
   tmp_h->left = tmp_h->right = NULL;
-  tmp_h->word = read_word(f);
+  tmp_h->word = str;
   tmp_h->count = 1;
   return tmp_h;
 }
