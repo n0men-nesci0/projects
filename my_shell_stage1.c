@@ -106,6 +106,12 @@ void print_arr(char** words_arr, char** arr_end) {
   return;
 }
 
+void free_all(char** words_arr, int size) {
+  for (int i = 0; i < size; ++i)
+    free(words_arr[i]);
+  free(words_arr);
+}
+
 int main(int argc, char** argv) {
   char *f_in_name = NULL, *f_out_name = NULL;
   keys_processing(argc, argv, &f_in_name, &f_out_name);
@@ -120,5 +126,6 @@ int main(int argc, char** argv) {
     free(line);
   }
   print_arr(words_arr, words_arr + index);
+  free_all(words_arr, index);
   return 0;
 }
