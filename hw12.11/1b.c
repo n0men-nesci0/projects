@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
       close(fd_in);
       close(fd[1]);
       close(fd[0]);
-      execlp(argv[1], argv[1], NULL); // pr1(arg1,arg2)->fd[1]
+      execlp(argv[1], argv[1], NULL);
     }
     else // parent
       if (!fork()) { // child pr2
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
         close(fd_out);
         close(fd[0]);
         close(fd[1]);
-        execlp(argv[3], argv[3], NULL); // pr2<-fd[0]
+        execlp(argv[3], argv[3], NULL);
       }
     // parent
     close(fd[0]);
