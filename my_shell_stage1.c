@@ -100,9 +100,9 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) {
   }
 }
 
-void print_arr(char** words_arr, char** arr_end) {
+void print_arr(char** words_arr, char** arr_end, FILE* f_out) {
   for (; words_arr < arr_end; ++words_arr)
-    printf("%s\n", *words_arr);
+    fprintf(f_out, "%s\n", *words_arr);
   return;
 }
 
@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
     words_arr = separate(words_arr, line, &r, &index);
     free(line);
   }
-  print_arr(words_arr, words_arr + index);
+  print_arr(words_arr, words_arr + index, f_out);
   free_all(words_arr, index);
   return 0;
 }
