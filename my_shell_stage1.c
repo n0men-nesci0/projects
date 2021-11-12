@@ -39,10 +39,6 @@ void open_files(char* f_in_name, char* f_out_name, FILE** f_in_ptr, FILE** f_out
   return;
 }
 
-int is_sprt_ch(int c) {
-  return c == '&' || c == '|' || c == ';' || c == '>' || c == '<' || c == '(' || c == ')';
-}
-
 char* read_line(FILE* f) {
   char* str = malloc(BASE2);
   int c, i, r = BASE2;
@@ -62,12 +58,23 @@ char* read_line(FILE* f) {
   return str;
 }
 
+char** add_to_arr(char** words_arr, char* word, int* r_ptr, int* index_ptr) {
+  if (!(*r_ptr)) {
+    *r_ptr = *index_ptr * (FACTOR - 1);
+    words_arr = realloc(words_arr, (*index_ptr + *r_ptr) * sizeof(char*));
+  }
+  words_arr[*index_ptr] = word;
+  ++(*index_ptr);
+  --(*r_ptr);
+  return words_arr;
+}
+
 char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) {
   int next_word, ins_quotes = 0, r_wrd = 0;
-  char* word= NULL;
+  char* word= NULL, *sprt = "&|<>;()", *double_sprt = "&|>";
   for (int i = 0, j = 0; ; ++i) {
     int c = line[i];
-    next_word = !c || !ins_quotes && (isspace(c) || is_sprt_ch(c));
+    next_word = !c || !ins_quotes && (isspace(c) || strchr(sprt, c));
     if (!next_word) {
       if (c == '"') {
         ins_quotes = !ins_quotes;
@@ -81,19 +88,29 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) {
       ++j;
       --r_wrd;
     }
-    else if (word) {
-      word = realloc(word, j + 1);
-      word[j] = 0;
-      if (!(*r_ptr)) {
-        *r_ptr = *index_ptr * (FACTOR - 1);
-        words_arr = realloc(words_arr, (*index_ptr + *r_ptr) * sizeof(char*));
+    else {
+      if (word) {
+        word = realloc(word, j + 1);
+        word[j] = 0;
+        words_arr = add_to_arr(words_arr, word, r_ptr, index_ptr);
+        word = NULL;
+        j = 0;
+        r_wrd = 0;
       }
-      words_arr[*index_ptr] = word;
-      word = NULL;
-      ++(*index_ptr);
-      --(*r_ptr);
-      j = 0;
-      r_wrd = 0;
+      if (strchr(sprt, c) && c) {
+        word = malloc(3);
+        word[0] = c;
+        j = 1;
+        if (strchr(double_sprt, c) && c == line[i+1]) {
+          word[j] = line[i+1];
+          ++j;
+        }
+        word[j] = 0;
+        words_arr = add_to_arr(words_arr, word, r_ptr, index_ptr);
+        word = NULL;
+        i = i + j - 1;
+        j = 0;
+      }
     }
     if (!c)
       return words_arr;
