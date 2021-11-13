@@ -74,7 +74,7 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) {
   char* word= NULL, *sprt = "&|<>;()", *double_sprt = "&|>";
   for (int i = 0, j = 0; ; ++i) {
     int c = line[i];
-    next_word = !c || !ins_quotes && (isspace(c) || strchr(sprt, c));
+    next_word = !c || (!ins_quotes && (isspace(c) || strchr(sprt, c)));
     if (!next_word) {
       if (c == '"') {
         ins_quotes = !ins_quotes;
@@ -104,11 +104,11 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) {
         if (strchr(double_sprt, c) && c == line[i+1]) {
           word[j] = line[i+1];
           ++j;
+          ++i;
         }
         word[j] = 0;
         words_arr = add_to_arr(words_arr, word, r_ptr, index_ptr);
         word = NULL;
-        i = i + j - 1;
         j = 0;
       }
     }
@@ -123,7 +123,7 @@ void print_arr(char** words_arr, char** arr_end, FILE* f_out) {
   return;
 }
 
-void free_all(char** words_arr, int size) {
+void free_arr(char** words_arr, int size) {
   for (int i = 0; i < size; ++i)
     free(words_arr[i]);
   free(words_arr);
@@ -135,14 +135,17 @@ int main(int argc, char** argv) {
   FILE *f_in = stdin, *f_out = stdout;
   open_files(f_in_name, f_out_name, &f_in, &f_out);
 
-  char** words_arr = malloc(sizeof(char*) * BASE1);
-  int r = BASE1, index = 0;
+  char** words_arr;
+  int r, index;
   char* line;
-  while (line = read_line(f_in)) {
+  while ((line = read_line(f_in))) {
+    index = 0;
+    r = BASE1;
+    words_arr = malloc(sizeof(char*) * BASE1);
     words_arr = separate(words_arr, line, &r, &index);
+    print_arr(words_arr, words_arr + index, f_out);
     free(line);
+    free_arr(words_arr, index);
   }
-  print_arr(words_arr, words_arr + index, f_out);
-  free_all(words_arr, index);
   return 0;
 }
