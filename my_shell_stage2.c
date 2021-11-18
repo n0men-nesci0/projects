@@ -165,12 +165,11 @@ int main(int argc, char** argv) {
   keys_processing(argc, argv, &f_in_name, &f_out_name);
   FILE *f_in = stdin, *f_out = stdout;
   open_files(f_in_name, f_out_name, &f_in, &f_out);
-  printf(">");
 
   char** words_arr;
   int r, index;
   char* line;
-  while ((line = read_line(f_in))) {
+  while (printf(">"), (line = read_line(f_in))) {
     index = 0;
     r = BASE1;
     words_arr = malloc(sizeof(char*) * BASE1);
@@ -178,7 +177,7 @@ int main(int argc, char** argv) {
     free(line);
     execute(words_arr);
     free_arr(words_arr, index);
-    printf(">");
   }
+  putchar('\n');
   return 0;
 }
