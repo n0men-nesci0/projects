@@ -1,5 +1,9 @@
-#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <wait.h>
+#include <errno.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -7,6 +11,31 @@
 #define BASE1 10
 #define BASE2 30
 #define FACTOR 1.5
+
+void execute(char** argv) {
+  if (strcmp(argv[0], "cd")) {
+    pid_t pid = fork();
+    if (!pid) { // child
+      execvp(argv[0], argv);
+      perror(NULL);
+      exit(errno);
+    }
+    else { // parent
+      int status;
+      wait(&status);
+    }
+  }
+  else { // parent && cmd == "cd"
+    int exit_status;
+    if (argv[1])
+      exit_status = chdir(argv[1]);
+    else
+      exit_status = chdir(getenv("HOME"));
+    if (exit_status < 0)
+      perror(NULL);
+  }
+  return;
+}
 
 void keys_processing(int argc, char** argv, char** f_i_nm_ptr, char** f_o_nm_ptr) {
   for (int i = 1; i < argc; ++i)
@@ -112,15 +141,11 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) {
         j = 0;
       }
     }
-    if (!c)
+    if (!c) {
+      words_arr = add_to_arr(words_arr, NULL, r_ptr, index_ptr);
       return words_arr;
+    }
   }
-}
-
-void print_arr(char** words_arr, char** arr_end, FILE* f_out) {
-  for (; words_arr < arr_end; ++words_arr)
-    fprintf(f_out, "%s\n", *words_arr);
-  return;
 }
 
 void free_arr(char** words_arr, int size) {
@@ -129,11 +154,18 @@ void free_arr(char** words_arr, int size) {
   free(words_arr);
 }
 
+void print_arr(char** words_arr, char** arr_end, FILE* f_out) {
+  for (; words_arr < arr_end; ++words_arr)
+    fprintf(f_out, "%s\n", *words_arr);
+  return;
+}
+
 int main(int argc, char** argv) {
   char *f_in_name = NULL, *f_out_name = NULL;
   keys_processing(argc, argv, &f_in_name, &f_out_name);
   FILE *f_in = stdin, *f_out = stdout;
   open_files(f_in_name, f_out_name, &f_in, &f_out);
+  printf(">");
 
   char** words_arr;
   int r, index;
@@ -143,9 +175,10 @@ int main(int argc, char** argv) {
     r = BASE1;
     words_arr = malloc(sizeof(char*) * BASE1);
     words_arr = separate(words_arr, line, &r, &index);
-    print_arr(words_arr, words_arr + index, f_out);
     free(line);
+    execute(words_arr);
     free_arr(words_arr, index);
+    printf(">");
   }
   return 0;
 }
