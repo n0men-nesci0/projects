@@ -37,7 +37,7 @@ char** del_from_arr(char** argv, int pos, int num) {
   }
 }
 
-void simple_execution(char** argv) { // call only inside child
+void simple_execution(char** argv) {
   if (strcmp(argv[0], "cd")) {
     execvp(argv[0], argv);
     perror("exec");
@@ -51,7 +51,6 @@ void simple_execution(char** argv) { // call only inside child
       exit_status = chdir(getenv("HOME"));
     if (exit_status < 0)
       perror(NULL);
-    exit(errno);
   }
   return;
 }
@@ -78,8 +77,10 @@ void conveyer(char** argv, int fd_in, int fd_out) {
         dup2(fd_in, 0);
         dup2(fd[1], 1);
         argv[right_lim] = NULL;
-        simple_execution(argv + left_lim);
-        perror("exec");
+        if (strcmp(argv[left_lim], "cd")) {
+          simple_execution(argv + left_lim);
+          perror("exec");
+        }
         exit(errno);
       default : // parent
         close(fd_in);
@@ -88,7 +89,13 @@ void conveyer(char** argv, int fd_in, int fd_out) {
         close(fd[1]);
     }
   }
+  if (!argv[0])
+    return;
   ++count_ps;
+  if (count_ps == 1 && !strcmp(argv[0], "cd")) {
+    simple_execution(argv);
+    return;
+  }
   pid_t pid = fork(); // last process
   switch (pid) {
     case -1 :
@@ -97,8 +104,10 @@ void conveyer(char** argv, int fd_in, int fd_out) {
     case 0 : // child
       dup2(fd_in, 0);
       dup2(fd_out, 1);
-      simple_execution(argv + left_lim);
-      perror("exec");
+      if (strcmp(argv[left_lim], "cd")) {
+        simple_execution(argv + left_lim);
+        perror("exec");
+      }
       exit(errno);
     default : // parent
       close(fd_in);
