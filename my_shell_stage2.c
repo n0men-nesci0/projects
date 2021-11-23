@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <sys/types.h>
+#include <fcntl.h>
 #include <wait.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -12,20 +13,37 @@
 #define BASE2 30
 #define FACTOR 1.5
 
-void execute(char** argv) {
-  if (strcmp(argv[0], "cd")) {
-    pid_t pid = fork();
-    if (!pid) { // child
-      execvp(argv[0], argv);
-      perror(NULL);
-      exit(errno);
-    }
-    else { // parent
-      int status;
-      wait(&status);
-    }
+void print_arr(char** words_arr) {
+  for (; *words_arr; ++words_arr)
+    printf("%s\n", *words_arr);
+  return;
+}
+
+char** del_from_arr(char** argv, int pos, int num) {
+  int length = 0;
+  for(; argv[length]; ++length);
+
+  for (int i = 0; i < num; ++i)
+    free(argv[pos + i]);
+
+  if (length - pos - num < pos) {
+    memmove(argv + pos, argv + pos + num, length - pos - num);
+    argv[length - num] = NULL;
+    return argv;
   }
-  else { // parent && cmd == "cd"
+  else {
+    memmove(argv + num, argv, pos);
+    return argv + num;
+  }
+}
+
+void simple_execution(char** argv) { // call only inside child
+  if (strcmp(argv[0], "cd")) {
+    execvp(argv[0], argv);
+    perror("exec");
+    exit(errno);
+  }
+  else {
     int exit_status;
     if (argv[1])
       exit_status = chdir(argv[1]);
@@ -33,45 +51,93 @@ void execute(char** argv) {
       exit_status = chdir(getenv("HOME"));
     if (exit_status < 0)
       perror(NULL);
+    exit(errno);
   }
   return;
 }
 
-void keys_processing(int argc, char** argv, char** f_i_nm_ptr, char** f_o_nm_ptr) {
-  for (int i = 1; i < argc; ++i)
-    if (!strcmp(argv[i], "-i")) {
-      if (i + 1 >= argc || argv[i+1][0] == '-')
-        fprintf(stderr, "WARNING : can't find input file name. Set default\n");
-      else *f_i_nm_ptr = argv[++i];
+void conveyer(char** argv, int fd_in, int fd_out) {
+  int count_ps = 0;
+  if (!fd_in)
+    fd_in = dup(0);
+  if (!fd_out)
+    fd_out = dup(1);
+  int left_lim = 0, right_lim, fd[2];
+  for (int i = 0; argv[i]; ++i) {
+    if (strcmp(argv[i], "|"))
+      continue;
+    ++count_ps;
+    right_lim = i;
+    pipe(fd);
+    pid_t pid = fork();
+    switch (pid) {
+      case -1 :
+        perror("fork");
+        return;
+      case 0 : // child
+        dup2(fd_in, 0);
+        dup2(fd[1], 1);
+        argv[right_lim] = NULL;
+        simple_execution(argv + left_lim);
+        perror("exec");
+        exit(errno);
+      default : // parent
+        close(fd_in);
+        fd_in = fd[0];
+        left_lim = right_lim + 1;
+        close(fd[1]);
     }
-    else if (!strcmp(argv[i], "-o")) {
-      if (i + 1 >= argc || argv[i+1][0] == '-')
-        fprintf(stderr,"WARNING : can't find output file name. Set default\n");
-      else *f_o_nm_ptr = argv[++i];
-    }
-    else {
-      fprintf(stderr, "FATAL ERROR : can't process argument %s\n", argv[i]);
-      exit(0);
-    }
-  return;
-}
-
-void open_files(char* f_in_name, char* f_out_name, FILE** f_in_ptr, FILE** f_out_ptr) {
-  if (f_in_name)
-    *f_in_ptr = fopen(f_in_name, "r");
-  if (!*f_in_ptr) {
-    fprintf(stderr, "FATAL ERROR : can't find input file\n");
-    exit(0);
   }
-  if (f_out_name)
-    *f_out_ptr = fopen(f_out_name, "w");
+  ++count_ps;
+  pid_t pid = fork(); // last process
+  switch (pid) {
+    case -1 :
+      perror("fork");
+      return;
+    case 0 : // child
+      dup2(fd_in, 0);
+      dup2(fd_out, 1);
+      simple_execution(argv + left_lim);
+      perror("exec");
+      exit(errno);
+    default : // parent
+      close(fd_in);
+      fd_in = fd[0];
+      left_lim = right_lim;
+      close(fd_out);
+  }
+  for (int i = 0; i < count_ps; ++i) {
+    wait(NULL);
+  }
   return;
 }
 
-char* read_line(FILE* f) {
+
+char** command(char** argv) {
+  int n, fd_in = 0;
+  for(n = 0; argv[n] != NULL && strcmp(argv[n], "<"); ++n);
+  if (argv[n] && argv[n + 1]) {
+    fd_in = open(argv[n + 1], O_RDONLY);
+    argv = del_from_arr(argv, n, 2);
+  }
+  int fd_out = 0;
+  for(n = 0; argv[n] != NULL && strncmp(argv[n], ">", 1); ++n);
+  if (argv[n] && argv[n + 1]) {
+    if (!strcmp(argv[n], ">"))
+      fd_out = open(argv[n + 1], O_WRONLY | O_CREAT | O_TRUNC, 0777);
+    else
+      fd_out = open(argv[n + 1], O_WRONLY | O_APPEND | O_CREAT, 0777);
+    argv = del_from_arr(argv, n, 2);
+  }
+  print_arr(argv);
+  conveyer(argv, fd_in, fd_out);
+  return argv;
+}
+
+char* read_line() {
   char* str = malloc(BASE2);
   int c, i, r = BASE2;
-  for (i = 0; (c = fgetc(f)) != '\n' && c != EOF; ++i, --r) {
+  for (i = 0; (c = getchar()) != '\n' && c != EOF; ++i, --r) {
     if (!r) {
       r = i * (FACTOR - 1);
       str = realloc(str, i + r);
@@ -148,35 +214,24 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) {
   }
 }
 
-void free_arr(char** words_arr, int size) {
-  for (int i = 0; i < size; ++i)
+void free_arr(char** words_arr) {
+  for (int i = 0; words_arr[i]; ++i)
     free(words_arr[i]);
   free(words_arr);
 }
 
-void print_arr(char** words_arr, char** arr_end, FILE* f_out) {
-  for (; words_arr < arr_end; ++words_arr)
-    fprintf(f_out, "%s\n", *words_arr);
-  return;
-}
-
 int main(int argc, char** argv) {
-  char *f_in_name = NULL, *f_out_name = NULL;
-  keys_processing(argc, argv, &f_in_name, &f_out_name);
-  FILE *f_in = stdin, *f_out = stdout;
-  open_files(f_in_name, f_out_name, &f_in, &f_out);
-
   char** words_arr;
   int r, index;
   char* line;
-  while (printf(">"), (line = read_line(f_in))) {
+  while (printf(">"), (line = read_line())) {
     index = 0;
     r = BASE1;
     words_arr = malloc(sizeof(char*) * BASE1);
     words_arr = separate(words_arr, line, &r, &index);
     free(line);
-    execute(words_arr);
-    free_arr(words_arr, index);
+    words_arr = command(words_arr);
+    free_arr(words_arr);
   }
   putchar('\n');
   return 0;
