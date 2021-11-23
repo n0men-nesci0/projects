@@ -23,10 +23,10 @@ char** del_from_arr(char** argv, int pos, int num) {
   int length = 0;
   for(; argv[length]; ++length);
 
-  for (int i = 0; i < num; ++i)
+  for (int i = 0; i < num; ++i) // free strings we want to delete
     free(argv[pos + i]);
 
-  if (length - pos - num < pos) {
+  if (length - pos - num < pos) { // which end of array is shorter and easier to move
     memmove(argv + pos, argv + pos + num, length - pos - num);
     argv[length - num] = NULL;
     return argv;
@@ -121,15 +121,14 @@ char** command(char** argv) {
     argv = del_from_arr(argv, n, 2);
   }
   int fd_out = 0;
-  for(n = 0; argv[n] != NULL && strncmp(argv[n], ">", 1); ++n);
+  for(n = 0; argv[n] != NULL && strncmp(argv[n], ">", 1); ++n); // search for a string starts with >
   if (argv[n] && argv[n + 1]) {
-    if (!strcmp(argv[n], ">"))
+    if (!strcmp(argv[n], ">")) // single >
       fd_out = open(argv[n + 1], O_WRONLY | O_CREAT | O_TRUNC, 0777);
-    else
+    else // double >
       fd_out = open(argv[n + 1], O_WRONLY | O_APPEND | O_CREAT, 0777);
     argv = del_from_arr(argv, n, 2);
   }
-  print_arr(argv);
   conveyer(argv, fd_in, fd_out);
   return argv;
 }
@@ -154,7 +153,7 @@ char* read_line() {
 }
 
 char** add_to_arr(char** words_arr, char* word, int* r_ptr, int* index_ptr) {
-  if (!(*r_ptr)) {
+  if (!(*r_ptr)) { // no memory left
     *r_ptr = *index_ptr * (FACTOR - 1);
     words_arr = realloc(words_arr, (*index_ptr + *r_ptr) * sizeof(char*));
   }
@@ -164,7 +163,7 @@ char** add_to_arr(char** words_arr, char* word, int* r_ptr, int* index_ptr) {
   return words_arr;
 }
 
-char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) {
+char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) { // r means number of remaining slots
   int next_word, ins_quotes = 0, r_wrd = 0;
   char* word= NULL, *sprt = "&|<>;()", *double_sprt = "&|>";
   for (int i = 0, j = 0; ; ++i) {
@@ -175,7 +174,7 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) {
         ins_quotes = !ins_quotes;
         continue;
       }
-      if (!r_wrd) {
+      if (!r_wrd) { // no memory left
         word = realloc(word, j + STEP);
         r_wrd = STEP;
       }
@@ -192,11 +191,11 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) {
         j = 0;
         r_wrd = 0;
       }
-      if (strchr(sprt, c) && c) {
+      if (strchr(sprt, c) && c) { // special symbol
         word = malloc(3);
         word[0] = c;
         j = 1;
-        if (strchr(double_sprt, c) && c == line[i+1]) {
+        if (strchr(double_sprt, c) && c == line[i + 1]) {
           word[j] = line[i+1];
           ++j;
           ++i;
