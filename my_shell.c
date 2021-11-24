@@ -77,10 +77,7 @@ void conveyer(char** argv, int fd_in, int fd_out) {
         dup2(fd[1], 1);
         free(argv[right_lim]);
         argv[right_lim] = NULL;
-        if (strcmp(argv[left_lim], "cd")) {
-          simple_execution(argv + left_lim);
-          perror("exec");
-        }
+        simple_execution(argv + left_lim);
         exit(errno);
       default : // parent
         close(fd_in);
@@ -102,8 +99,7 @@ void conveyer(char** argv, int fd_in, int fd_out) {
     case 0 : // child
       dup2(fd_in, 0);
       dup2(fd_out, 1);
-      if (strcmp(argv[left_lim], "cd"))
-        simple_execution(argv + left_lim);
+      simple_execution(argv + left_lim);
       exit(errno);
     default : // parent
       close(fd_in);
