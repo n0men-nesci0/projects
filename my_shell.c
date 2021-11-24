@@ -27,12 +27,12 @@ char** del_from_arr(char** argv, int pos, int num) {
     free(argv[pos + i]);
 
   if (length - pos - num < pos) { // which end of array is shorter and easier to move
-    memmove(argv + pos, argv + pos + num, length - pos - num);
+    memmove(argv + pos, argv + pos + num, (length - pos - num) * sizeof(char*));
     argv[length - num] = NULL;
     return argv;
   }
   else {
-    memmove(argv + num, argv, pos);
+    memmove(argv + num, argv, pos * sizeof(char*));
     return argv + num;
   }
 }
@@ -40,7 +40,7 @@ char** del_from_arr(char** argv, int pos, int num) {
 void simple_execution(char** argv) {
   if (strcmp(argv[0], "cd")) {
     execvp(argv[0], argv);
-    perror("exec");
+    perror("exec here");
     exit(errno);
   }
   else {
@@ -55,13 +55,11 @@ void simple_execution(char** argv) {
   return;
 }
 
-void conveyer(char** argv, int fd_in, int fd_out) {
-  int count_ps = 0;
-  if (!fd_in)
-    fd_in = dup(0);
-  if (!fd_out)
-    fd_out = dup(1);
-  int left_lim = 0, right_lim, fd[2];
+void conveyer(char** argv, int fd_in, int fd_out) { 
+  printf("%d %d\n", fd_in, fd_out);
+  if (!argv[0])
+    return;
+  int count_ps = 0, left_lim = 0, right_lim, fd[2];
   for (int i = 0; argv[i]; ++i) {
     if (strcmp(argv[i], "|"))
       continue;
@@ -89,8 +87,6 @@ void conveyer(char** argv, int fd_in, int fd_out) {
         close(fd[1]);
     }
   }
-  if (!argv[0])
-    return;
   ++count_ps;
   if (count_ps == 1 && !strcmp(argv[0], "cd")) {
     simple_execution(argv);
@@ -104,15 +100,11 @@ void conveyer(char** argv, int fd_in, int fd_out) {
     case 0 : // child
       dup2(fd_in, 0);
       dup2(fd_out, 1);
-      if (strcmp(argv[left_lim], "cd")) {
+      if (strcmp(argv[left_lim], "cd"))
         simple_execution(argv + left_lim);
-        perror("exec");
-      }
       exit(errno);
     default : // parent
       close(fd_in);
-      fd_in = fd[0];
-      left_lim = right_lim;
       close(fd_out);
   }
   for (int i = 0; i < count_ps; ++i) {
@@ -123,19 +115,23 @@ void conveyer(char** argv, int fd_in, int fd_out) {
 
 
 char** command(char** argv) {
-  int n, fd_in = 0;
+  int n, fd_in = -1;
   for(n = 0; argv[n] != NULL && strcmp(argv[n], "<"); ++n);
   if (argv[n] && argv[n + 1]) {
     fd_in = open(argv[n + 1], O_RDONLY);
+    if (fd_in == -1)
+      perror("open");
     argv = del_from_arr(argv, n, 2);
   }
-  int fd_out = 0;
+  int fd_out = -1;
   for(n = 0; argv[n] != NULL && strncmp(argv[n], ">", 1); ++n); // search for a string starts with >
   if (argv[n] && argv[n + 1]) {
     if (!strcmp(argv[n], ">")) // single >
       fd_out = open(argv[n + 1], O_WRONLY | O_CREAT | O_TRUNC, 0777);
     else // double >
       fd_out = open(argv[n + 1], O_WRONLY | O_APPEND | O_CREAT, 0777);
+    if (fd_out == -1)
+      perror("open");
     argv = del_from_arr(argv, n, 2);
   }
   conveyer(argv, fd_in, fd_out);
@@ -222,24 +218,23 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) { // r
   }
 }
 
-void free_arr(char** words_arr) {
-  for (int i = 0; words_arr[i]; ++i)
-    free(words_arr[i]);
-  free(words_arr);
-}
-
-int main(int argc, char** argv) {
+int main() {
   char** words_arr;
   int r, index;
   char* line;
   while (printf(">"), (line = read_line())) {
+    printf("%s\n", line);
     index = 0;
     r = BASE1;
     words_arr = malloc(sizeof(char*) * BASE1);
     words_arr = separate(words_arr, line, &r, &index);
     free(line);
+    char** arr_head = words_arr; // for free()
     words_arr = command(words_arr);
-    free_arr(words_arr);
+    for (int i = 0; words_arr[i]; ++i)
+      free(words_arr[i]);
+    free(arr_head);
+    sleep(2);
   }
   putchar('\n');
   return 0;
