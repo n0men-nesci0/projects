@@ -40,7 +40,9 @@ char** del_from_arr(char** argv, int pos, int num) {
 void simple_execution(char** argv) {
   if (strcmp(argv[0], "cd")) {
     execvp(argv[0], argv);
-    perror("exec here");
+    perror("exec");
+    close(0);
+    close(1);
     exit(errno);
   }
   else {
@@ -55,8 +57,7 @@ void simple_execution(char** argv) {
   return;
 }
 
-void conveyer(char** argv, int fd_in, int fd_out) { 
-  printf("%d %d\n", fd_in, fd_out);
+void conveyer(char** argv, int fd_in, int fd_out) {
   if (!argv[0])
     return;
   int count_ps = 0, left_lim = 0, right_lim, fd[2];
@@ -74,6 +75,7 @@ void conveyer(char** argv, int fd_in, int fd_out) {
       case 0 : // child
         dup2(fd_in, 0);
         dup2(fd[1], 1);
+        free(argv[right_lim]);
         argv[right_lim] = NULL;
         if (strcmp(argv[left_lim], "cd")) {
           simple_execution(argv + left_lim);
@@ -223,7 +225,6 @@ int main() {
   int r, index;
   char* line;
   while (printf(">"), (line = read_line())) {
-    printf("%s\n", line);
     index = 0;
     r = BASE1;
     words_arr = malloc(sizeof(char*) * BASE1);
@@ -234,7 +235,6 @@ int main() {
     for (int i = 0; words_arr[i]; ++i)
       free(words_arr[i]);
     free(arr_head);
-    sleep(2);
   }
   putchar('\n');
   return 0;
