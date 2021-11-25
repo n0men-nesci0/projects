@@ -57,82 +57,90 @@ void simple_execution(char** argv) {
   return;
 }
 
-void conveyer(char** argv, int fd_in, int fd_out) {
-  if (!argv[0])
-    return;
-  int count_ps = 0, left_lim = 0, right_lim, fd[2];
-  for (int i = 0; argv[i]; ++i) {
-    if (strcmp(argv[i], "|"))
-      continue;
-    ++count_ps;
-    right_lim = i;
-    pipe(fd);
-    pid_t pid = fork();
-    switch (pid) {
-      case -1 :
-        perror("fork");
-        return;
-      case 0 : // child
-        dup2(fd_in, 0);
-        dup2(fd[1], 1);
-        free(argv[right_lim]);
-        argv[right_lim] = NULL;
-        simple_execution(argv + left_lim);
-        exit(errno);
-      default : // parent
-        close(fd_in);
-        fd_in = fd[0];
-        left_lim = right_lim + 1;
-        close(fd[1]);
+char** command(char** argv) {
+  int left_lim = 0, right_lim, fd0 = -1, fd1 = -1, count_ps = 0, fd[2];
+  for(int i = 0; argv[i]; ++i) {
+    if (!strcmp(argv[i], "|")) {
+      right_lim = i;
+      if (!argv[left_lim])
+        continue;
+      if (fd1 < 0) {
+        pipe(fd);
+        fd1 = fd[1];
+      }
+      else
+        fd[0] = -1;
+      pid_t pid = fork();
+      switch (pid) {
+        case -1 :
+          perror("fork");
+          exit(errno);
+        case 0 : // child
+          dup2(fd0, 0);
+          dup2(fd1, 1);
+          free(argv[right_lim]);
+          argv[right_lim] = NULL;
+          simple_execution(argv + left_lim);
+          exit(errno);
+        default : // parent
+          close(fd0);
+          fd0 = fd[0];
+          left_lim = right_lim + 1;
+          close(fd1);
+          fd1 = -1;
+      }
+      ++count_ps;
+    }
+    if (!strcmp(argv[i], "<")) {
+      if (!argv[i + 1] || !strcmp(argv[i], "|")) {
+        printf("WRONG COMMAND\n");
+      }
+      else {
+        fd0 = open(argv[i + 1], O_RDONLY);
+        if (fd0 == -1)
+          perror("open");
+        argv = del_from_arr(argv, i, 2);
+        --i;
+      }
+    }
+    if (!strncmp(argv[i], ">", 1)) {
+      if (!argv[i + 1] || !strcmp(argv[i], "|")) {
+        printf("WRONG COMMAND\n");
+      }
+      else {
+        if (!strcmp(argv[i], ">")) // single >
+          fd1 = open(argv[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0777);
+        else // double >
+          fd1 = open(argv[i + 1], O_WRONLY | O_APPEND | O_CREAT, 0777);
+        if (fd1 == -1)
+          perror("open");
+        argv = del_from_arr(argv, i, 2);
+        --i;
+      }
     }
   }
   ++count_ps;
   if (count_ps == 1 && !strcmp(argv[0], "cd")) {
     simple_execution(argv);
-    return;
+    return argv;
   }
   pid_t pid = fork(); // last process
   switch (pid) {
     case -1 :
       perror("fork");
-      return;
+      return argv;
     case 0 : // child
-      dup2(fd_in, 0);
-      dup2(fd_out, 1);
+      dup2(fd0, 0);
+      dup2(fd1, 1);
       simple_execution(argv + left_lim);
       exit(errno);
     default : // parent
-      close(fd_in);
-      close(fd_out);
+      close(fd0);
+      close(fd1);
   }
   for (int i = 0; i < count_ps; ++i) {
     wait(NULL);
   }
-  return;
-}
-
-
-char** command(char** argv) {
-  int n, fd_in = -1;
-  for(n = 0; argv[n] != NULL && strcmp(argv[n], "<"); ++n);
-  if (argv[n] && argv[n + 1]) {
-    fd_in = open(argv[n + 1], O_RDONLY);
-    if (fd_in == -1)
-      perror("open");
-    argv = del_from_arr(argv, n, 2);
-  }
-  int fd_out = -1;
-  for(n = 0; argv[n] != NULL && strncmp(argv[n], ">", 1); ++n); // search for a string starts with >
-  if (argv[n] && argv[n + 1]) {
-    if (!strcmp(argv[n], ">")) // single >
-      fd_out = open(argv[n + 1], O_WRONLY | O_CREAT | O_TRUNC, 0777);
-    else // double >
-      fd_out = open(argv[n + 1], O_WRONLY | O_APPEND | O_CREAT, 0777);
-    if (fd_out == -1)
-      perror("open");
-    argv = del_from_arr(argv, n, 2);
-  }
-  conveyer(argv, fd_in, fd_out);
   return argv;
 }
 
@@ -226,7 +234,7 @@ int main() {
     words_arr = malloc(sizeof(char*) * BASE1);
     words_arr = separate(words_arr, line, &r, &index);
     free(line);
-    char** arr_head = words_arr; // for free()
+    char** arr_head = words_arr;
     words_arr = command(words_arr);
     for (int i = 0; words_arr[i]; ++i)
       free(words_arr[i]);
