@@ -277,10 +277,14 @@ int main() {
     bg_ps += shell_command(words_arr);
     for (int i = 0; i < bg_ps; ++i) {
       int status;
-      pid_t pid = waitpid(-1, &status, WNOHANG);
-      if (pid > 0 && WIFEXITED(status)) {
-        printf("background process with pid %d exit with status %d\n", pid, WEXITSTATUS(status));
+      pid_t pid = waitpid(-1, &status, 0);
+      if (pid > 0) {
+        if (WIFEXITED(status))
+          printf("background process with pid %d exit with status %d\n", pid, WEXITSTATUS(status));
+        else if (WIFSIGNALED(status))
+          printf("background process with pid %d killed by signal number %d",pid, WTERMSIG(status));
         --bg_ps;
+        --i;
       }
     }
     free(words_arr);
