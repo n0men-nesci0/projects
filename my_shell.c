@@ -13,6 +13,8 @@
 #define BASE2 30
 #define FACTOR 1.5
 
+int bg_flag = 0;
+
 void print_arr(char** words_arr) {
   for (; *words_arr; ++words_arr)
     printf("%s\n", *words_arr);
@@ -57,8 +59,12 @@ void simple_execution(char** argv) {
   return;
 }
 
-char** command(char** argv) {
-  int left_lim = 0, right_lim, fd0 = -1, fd1 = -1, count_ps = 0, fd[2];
+int command(char** argv) {
+  int left_lim = 0, right_lim, fd0 = -1, fd1 = -1, fd[2], count_ps = 0;
+  if (bg_flag) {
+    signal(SIGINT, SIG_IGN);
+    fd0 = open("/dev/null", O_RDWR);
+  }
   for(int i = 0; argv[i]; ++i) {
     if (!strcmp(argv[i], "|")) {
       right_lim = i;
@@ -74,8 +80,10 @@ char** command(char** argv) {
       switch (pid) {
         case -1 :
           perror("fork");
-          exit(errno);
+          return count_ps;
         case 0 : // child
+          if (bg_flag)
+            setpgrp();
           dup2(fd0, 0);
           dup2(fd1, 1);
           free(argv[right_lim]);
@@ -96,6 +104,7 @@ char** command(char** argv) {
         printf("WRONG COMMAND\n");
       }
       else {
+        close(fd0);
         fd0 = open(argv[i + 1], O_RDONLY);
         if (fd0 == -1)
           perror("open");
@@ -109,9 +118,9 @@ char** command(char** argv) {
       }
       else {
         if (!strcmp(argv[i], ">")) // single >
-          fd1 = open(argv[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0777);
+          fd1 = open(argv[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0666);
         else // double >
-          fd1 = open(argv[i + 1], O_WRONLY | O_APPEND | O_CREAT, 0777);
+          fd1 = open(argv[i + 1], O_WRONLY | O_APPEND | O_CREAT, 0666);
         if (fd1 == -1)
           perror("open");
         argv = del_from_arr(argv, i, 2);
@@ -122,14 +131,21 @@ char** command(char** argv) {
   ++count_ps;
   if (count_ps == 1 && !strcmp(argv[0], "cd")) {
     simple_execution(argv);
-    return argv;
+    return 0;
+  }
+  if (bg_flag) {
+    signal(SIGINT, SIG_DFL);
+    if (fd1 < 0)
+      fd1 = open("/dev/null", O_RDWR);
   }
   pid_t pid = fork(); // last process
   switch (pid) {
     case -1 :
       perror("fork");
-      return argv;
+      return count_ps;
     case 0 : // child
+      if (bg_flag)
+        setpgrp();
       dup2(fd0, 0);
       dup2(fd1, 1);
       simple_execution(argv + left_lim);
@@ -138,10 +154,33 @@ char** command(char** argv) {
       close(fd0);
       close(fd1);
   }
-  for (int i = 0; i < count_ps; ++i) {
-    wait(NULL);
+  for (int i = 0; argv[i]; ++i)
+    free(argv[i]);
+  if (!bg_flag)
+    for (int i = 0; i < count_ps; ++i) {
+      waitpid(0, NULL, 0);
+    }
+  return count_ps;
+}
+
+int shell_command(char** argv) {
+  int left_lim = 0, right_lim, bg_ps = 0;
+  for (int i = 0; argv[i]; ++i) {
+    if (!strcmp(argv[i], "&")) {
+      right_lim = i;
+      if (!argv[left_lim])
+        continue;
+      free(argv[right_lim]);
+      argv[right_lim] = NULL;
+      bg_flag = 1;
+      bg_ps += command(argv + left_lim);
+      bg_flag = 0;
+      left_lim = right_lim + 1;
+    }
   }
-  return argv;
+  if (argv[left_lim])
+    command(argv + left_lim);
+  return bg_ps;
 }
 
 char* read_line() {
@@ -226,19 +265,25 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) { // r
 
 int main() {
   char** words_arr;
-  int r, index;
+  int r, index, bg_ps = 0;
   char* line;
+  pid_t* arr_pid;
   while (printf(">"), (line = read_line())) {
     index = 0;
     r = BASE1;
     words_arr = malloc(sizeof(char*) * BASE1);
     words_arr = separate(words_arr, line, &r, &index);
     free(line);
-    char** arr_head = words_arr;
-    words_arr = command(words_arr);
-    for (int i = 0; words_arr[i]; ++i)
-      free(words_arr[i]);
-    free(arr_head);
+    bg_ps += shell_command(words_arr);
+    for (int i = 0; i < bg_ps; ++i) {
+      int status;
+      pid_t pid = waitpid(-1, &status, WNOHANG);
+      if (pid > 0 && WIFEXITED(status)) {
+        printf("background process with pid %d exit with status %d\n", pid, WEXITSTATUS(status));
+        --bg_ps;
+      }
+    }
+    free(words_arr);
   }
   putchar('\n');
   return 0;
