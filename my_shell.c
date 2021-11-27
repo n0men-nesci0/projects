@@ -61,10 +61,8 @@ void simple_execution(char** argv) {
 
 int command(char** argv) {
   int left_lim = 0, right_lim, fd0 = -1, fd1 = -1, fd[2], count_ps = 0;
-  if (bg_flag) {
-    signal(SIGINT, SIG_IGN);
+  if (bg_flag)
     fd0 = open("/dev/null", O_RDWR);
-  }
   for(int i = 0; argv[i]; ++i) {
     if (!strcmp(argv[i], "|")) {
       right_lim = i;
@@ -84,6 +82,8 @@ int command(char** argv) {
         case 0 : // child
           if (bg_flag)
             setpgrp();
+          else
+            signal(SIGINT, SIG_DFL);
           dup2(fd0, 0);
           dup2(fd1, 1);
           free(argv[right_lim]);
@@ -133,11 +133,8 @@ int command(char** argv) {
     simple_execution(argv);
     return 0;
   }
-  if (bg_flag) {
-    signal(SIGINT, SIG_DFL);
-    if (fd1 < 0)
+  if (bg_flag && fd1 < 0)
       fd1 = open("/dev/null", O_RDWR);
-  }
   pid_t pid = fork(); // last process
   switch (pid) {
     case -1 :
@@ -146,6 +143,8 @@ int command(char** argv) {
     case 0 : // child
       if (bg_flag)
         setpgrp();
+      else
+        signal(SIGINT, SIG_DFL);
       dup2(fd0, 0);
       dup2(fd1, 1);
       simple_execution(argv + left_lim);
@@ -264,11 +263,14 @@ char** separate(char** words_arr, char* line, int* r_ptr, int* index_ptr) { // r
 }
 
 int main() {
+  signal(SIGINT, SIG_IGN);
   char** words_arr;
   int r, index, bg_ps = 0;
   char* line;
   pid_t* arr_pid;
-  while (printf(">"), (line = read_line())) {
+  char* cur_dir;
+  while (printf("\x1b[32m%s>\x1b[0m", cur_dir = getcwd(NULL, 0)), (line = read_line())) {
+    free(cur_dir);
     index = 0;
     r = BASE1;
     words_arr = malloc(sizeof(char*) * BASE1);
@@ -277,18 +279,19 @@ int main() {
     bg_ps += shell_command(words_arr);
     for (int i = 0; i < bg_ps; ++i) {
       int status;
-      pid_t pid = waitpid(-1, &status, 0);
+      pid_t pid = waitpid(-1, &status, WNOHANG);
       if (pid > 0) {
         if (WIFEXITED(status))
-          printf("background process with pid %d exit with status %d\n", pid, WEXITSTATUS(status));
+          printf("\x1b[31mbackground process with pid %d exit with status %d\x1b[0m\n", pid, WEXITSTATUS(status));
         else if (WIFSIGNALED(status))
-          printf("background process with pid %d killed by signal number %d",pid, WTERMSIG(status));
+          printf("\x1b[31mbackground process with pid %d killed by signal number %d\x1b[0m\n",pid, WTERMSIG(status));
         --bg_ps;
         --i;
       }
     }
     free(words_arr);
   }
+  free(cur_dir);
   putchar('\n');
   return 0;
 }
