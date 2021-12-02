@@ -273,7 +273,7 @@ int main() {
   char* line;
   pid_t* arr_pid;
   char* cur_dir;
-  while (printf("%s%s%s>", COLOR_GREEN, cur_dir = getcwd(NULL, 0), COLOR_DEFAULT), (line = read_line())) {
+  while (printf("%s%s%s>", COLOR_RED, cur_dir = getcwd(NULL, 0), COLOR_DEFAULT), (line = read_line())) {
     free(cur_dir);
     index = 0;
     r = BASE1;
@@ -285,10 +285,14 @@ int main() {
       int status;
       pid_t pid = waitpid(-1, &status, WNOHANG);
       if (pid > 0) {
-        if (WIFEXITED(status))
-          printf("%sbackground process with pid %d exit with status %d%s\n", COLOR_RED, pid, WEXITSTATUS(status), COLOR_DEFAULT);
+        if (WIFEXITED(status)) {
+          int exit_status = WEXITSTATUS(status);
+          printf("background process with pid %d exit with status %d\n", pid, exit_status);
+          if (exit_status)
+            printf("ERROR : %s\n", strerror(exit_status));
+        }
         else if (WIFSIGNALED(status))
-          printf("%sbackground process with pid %d killed by signal number %d%s\n",COLOR_RED, pid, WTERMSIG(status), COLOR_DEFAULT);
+          printf("background process with pid %d killed by signal number %d\n", pid, WTERMSIG(status));
         --bg_ps;
         --i;
       }
