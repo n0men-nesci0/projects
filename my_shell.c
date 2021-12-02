@@ -12,6 +12,9 @@
 #define BASE1 10
 #define BASE2 30
 #define FACTOR 1.5
+#define COLOR_RED "\x1b[31m"
+#define COLOR_GREEN "\x1b[32m"
+#define COLOR_DEFAULT "\x1b[0m"
 
 int bg_flag = 0;
 
@@ -42,7 +45,8 @@ char** del_from_arr(char** argv, int pos, int num) {
 void simple_execution(char** argv) {
   if (strcmp(argv[0], "cd")) {
     execvp(argv[0], argv);
-    perror("exec");
+    if (!bg_flag)
+      perror("exec");
     close(0);
     close(1);
     exit(errno);
@@ -269,7 +273,7 @@ int main() {
   char* line;
   pid_t* arr_pid;
   char* cur_dir;
-  while (printf("\x1b[32m%s>\x1b[0m", cur_dir = getcwd(NULL, 0)), (line = read_line())) {
+  while (printf("%s%s%s>", COLOR_GREEN, cur_dir = getcwd(NULL, 0), COLOR_DEFAULT), (line = read_line())) {
     free(cur_dir);
     index = 0;
     r = BASE1;
@@ -282,9 +286,9 @@ int main() {
       pid_t pid = waitpid(-1, &status, WNOHANG);
       if (pid > 0) {
         if (WIFEXITED(status))
-          printf("\x1b[31mbackground process with pid %d exit with status %d\x1b[0m\n", pid, WEXITSTATUS(status));
+          printf("%sbackground process with pid %d exit with status %d%s\n", COLOR_RED, pid, WEXITSTATUS(status), COLOR_DEFAULT);
         else if (WIFSIGNALED(status))
-          printf("\x1b[31mbackground process with pid %d killed by signal number %d\x1b[0m\n",pid, WTERMSIG(status));
+          printf("%sbackground process with pid %d killed by signal number %d%s\n",COLOR_RED, pid, WTERMSIG(status), COLOR_DEFAULT);
         --bg_ps;
         --i;
       }
