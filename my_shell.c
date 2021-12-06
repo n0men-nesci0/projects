@@ -194,16 +194,25 @@ int conditional_command(char** argv) {
       }
       left_lim = right_lim + 1;
     }
-    else if (!strcmp(argv[i], ";")) {
+  }
+  if (argv[left_lim])
+    command(argv + left_lim, &count_ps);
+  return count_ps;
+}
+
+int semicolon_processing(char** argv) {
+  int left_lim = 0, right_lim, count_ps = 0;
+  for (int i = 0; argv[i]; ++i) {
+    if (!strcmp(argv[i], ";")) {
       right_lim = i;
       free(argv[right_lim]);
       argv[right_lim] = NULL;
-      command(argv + left_lim, &count_ps);
+      count_ps = conditional_command(argv + left_lim);
       left_lim = right_lim + 1;
     }
   }
   if (argv[left_lim])
-    command(argv + left_lim, &count_ps);
+    count_ps = conditional_command(argv + left_lim);
   return count_ps;
 }
 
@@ -217,13 +226,13 @@ int shell_command(char** argv) {
       free(argv[right_lim]);
       argv[right_lim] = NULL;
       bg_flag = 1;
-      bg_ps += conditional_command(argv + left_lim);
+      bg_ps += semicolon_processing(argv + left_lim);
       bg_flag = 0;
       left_lim = right_lim + 1;
     }
   }
   if (argv[left_lim])
-    conditional_command(argv + left_lim);
+    semicolon_processing(argv + left_lim);
   return bg_ps;
 }
 
