@@ -63,8 +63,8 @@ void simple_execution(char** argv) {
   return;
 }
 
-int command(char** argv) {
-  int left_lim = 0, right_lim, fd0 = -1, fd1 = -1, fd[2], count_ps = 0;
+int command(char** argv, int* count_ps) {
+  int left_lim = 0, right_lim, fd0 = -1, fd1 = -1, fd[2], exit_status = 0;
   if (bg_flag)
     fd0 = open("/dev/null", O_RDWR);
   for(int i = 0; argv[i]; ++i) {
@@ -82,7 +82,7 @@ int command(char** argv) {
       switch (pid) {
         case -1 :
           perror("fork");
-          return count_ps;
+          return errno;
         case 0 : // child
           if (bg_flag)
             setpgrp();
@@ -95,13 +95,14 @@ int command(char** argv) {
           simple_execution(argv + left_lim);
           exit(errno);
         default : // parent
+          printf("[%d]\t%d\n", *count_ps, pid);
           close(fd0);
           fd0 = fd[0];
           left_lim = right_lim + 1;
           close(fd1);
           fd1 = -1;
       }
-      ++count_ps;
+      ++(*count_ps);
     }
     if (!strcmp(argv[i], "<")) {
       if (!argv[i + 1] || !strcmp(argv[i], "|")) {
@@ -132,18 +133,16 @@ int command(char** argv) {
       }
     }
   }
-  ++count_ps;
-  if (count_ps == 1 && !strcmp(argv[0], "cd")) {
-    simple_execution(argv);
-    return 0;
-  }
+  ++(*count_ps);
+  if (*count_ps == 1 && !strcmp(argv[0], "cd") && !bg_flag)
+    return errno;
   if (bg_flag && fd1 < 0)
       fd1 = open("/dev/null", O_RDWR);
   pid_t pid = fork(); // last process
   switch (pid) {
     case -1 :
       perror("fork");
-      return count_ps;
+      return errno;
     case 0 : // child
       if (bg_flag)
         setpgrp();
@@ -159,10 +158,52 @@ int command(char** argv) {
   }
   for (int i = 0; argv[i]; ++i)
     free(argv[i]);
-  if (!bg_flag)
-    for (int i = 0; i < count_ps; ++i) {
+  if (!bg_flag) {
+    for (int i = 0; i < *count_ps - 1; ++i) {
       waitpid(0, NULL, 0);
     }
+    waitpid(pid, &exit_status, 0);
+  }
+  return WEXITSTATUS(exit_status);
+}
+
+int conditional_command(char** argv) {
+  int left_lim = 0, right_lim, count_ps = 0;
+  for (int i = 0; argv[i]; ++i) {
+    if (!strcmp(argv[i], "&&")) {
+      right_lim = i;
+      free(argv[right_lim]);
+      argv[right_lim] = NULL;
+      int exit_status = command(argv + left_lim, &count_ps);
+      if (exit_status) {
+        for (++i; argv[i]; ++i)
+          free(argv[i]);
+        return count_ps;
+      }
+      left_lim = right_lim + 1;
+    }
+    else if (!strcmp(argv[i], "||")) {
+      right_lim = i;
+      free(argv[right_lim]);
+      argv[right_lim] = NULL;
+      int exit_status = command(argv + left_lim, &count_ps);
+      if (!exit_status) {
+        for (++i; argv[i]; ++i)
+          free(argv[i]);
+        return count_ps;
+      }
+      left_lim = right_lim + 1;
+    }
+    else if (!strcmp(argv[i], ";")) {
+      right_lim = i;
+      free(argv[right_lim]);
+      argv[right_lim] = NULL;
+      command(argv + left_lim, &count_ps);
+      left_lim = right_lim + 1;
+    }
+  }
+  if (argv[left_lim])
+    command(argv + left_lim, &count_ps);
   return count_ps;
 }
 
@@ -176,13 +217,13 @@ int shell_command(char** argv) {
       free(argv[right_lim]);
       argv[right_lim] = NULL;
       bg_flag = 1;
-      bg_ps += command(argv + left_lim);
+      bg_ps += conditional_command(argv + left_lim);
       bg_flag = 0;
       left_lim = right_lim + 1;
     }
   }
   if (argv[left_lim])
-    command(argv + left_lim);
+    conditional_command(argv + left_lim);
   return bg_ps;
 }
 
@@ -271,7 +312,6 @@ int main() {
   char** words_arr;
   int r, index, bg_ps = 0;
   char* line;
-  pid_t* arr_pid;
   char* cur_dir;
   while (printf("%s%s%s>", COLOR_RED, cur_dir = getcwd(NULL, 0), COLOR_DEFAULT), (line = read_line())) {
     free(cur_dir);
