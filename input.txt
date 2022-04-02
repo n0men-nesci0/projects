@@ -1,5 +1,5 @@
-Bus Mersedes-Benz 54 Omsk Kazan 1890
-Bus Toyota 54 Omsk Kazan 1890
-Plane cargo 777 Omsk Kazan 1890
-Bus BMW 58 Kazan Omsk 1890
-Plane standard 819 Kazan Samara 370
+Bus BMW 57 Omsk Kazan 1890
+Bus BMW 56 Moscow Ufa 1350
+Train passenger 94 Ufa Kazan 550
+Plane scout 728 Samara Kazan 370
+Train high-speed 103 Samara Kazan 370
