@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstring>
+#include <climits>
 #define DFLT_BUS_SPEED 60
 #define DFLT_TRAIN_SPEED 100
 #define DFLT_PLANE_SPEED 750
@@ -123,7 +124,7 @@ public :
     }
     void operator() () {
         cout << "operator() :" << endl;
-        cout << "poof" << endl;
+        cout << "*whistle*" << endl;
     }
     friend ostream& operator << (ostream& os, const Plane& plane);
 };
