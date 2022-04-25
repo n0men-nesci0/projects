@@ -1,0 +1,10 @@
+program {
+	int x;
+	string s1, s2 = "Hello World!";
+	boolean b1 = true, b2 = false;
+	while (x) {
+		write(x);
+		read(x);
+	}
+}
+	
