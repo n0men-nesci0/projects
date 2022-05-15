@@ -1,0 +1,138 @@
+case LEX_NULL:
+	str_lex = "NULL";
+	break;
+case LEX_PROG:
+	str_lex = "PROG";
+	break;
+case LEX_IF:
+	str_lex = "IF";
+	break;
+case LEX_ELSE:
+	str_lex = "ELSE";
+	break;
+case LEX_WHILE:
+	str_lex = "WHILE";
+	break;
+case LEX_READ:
+	str_lex = "READ";
+	break;
+case LEX_WRITE:
+	str_lex = "WRITE";
+	break;
+case LEX_NOT:
+	str_lex = "NOT";
+	break;
+case LEX_AND:
+	str_lex = "AND";
+	break;
+case LEX_OR:
+	str_lex = "OR";
+	break;
+case LEX_GOTO:
+	str_lex = "GOTO";
+	break;
+case LEX_BOOLEAN:
+	str_lex = "BOOLEAN";
+	break;
+case LEX_INT:
+	str_lex = "INT";
+	break;
+case LEX_STRING:
+	str_lex = "STRING";
+	break;
+case LEX_TRUE:
+	str_lex = "TRUE";
+	break;
+case LEX_FALSE:
+	str_lex = "FALSE";
+	break;
+case LEX_BREAK:
+	str_lex = "BREAK";
+	break;
+case LEX_FIN:
+	str_lex = "FIN";
+	break;
+case LEX_SEMICOLON:
+	str_lex = "SEMICOLON";
+	break;
+case LEX_COMMA:
+	str_lex = "COMMA";
+	break;
+case LEX_COLON:
+	str_lex = "COLON";
+	break;
+case LEX_LPAREN:
+	str_lex = "LPAREN";
+	break;
+case LEX_RPAREN:
+	str_lex = "RPAREN";
+	break;
+case LEX_EQ:
+	str_lex = "EQ";
+	break;
+case LEX_LSS:
+	str_lex = "LSS";
+	break;
+case LEX_GTR:
+	str_lex = "GTR";
+	break;
+case LEX_PLUS:
+	str_lex = "PLUS";
+	break;
+case LEX_MINUS:
+	str_lex = "MINUS";
+	break;
+case LEX_TIMES:
+	str_lex = "TIMES";
+	break;
+case LEX_SLASH:
+	str_lex = "SLASH";
+	break;
+case LEX_LEQ:
+	str_lex = "LEQ";
+	break;
+case LEX_NEQ:
+	str_lex = "NEQ";
+	break;
+case LEX_GEQ:
+	str_lex = "GEQ";
+	break;
+case LEX_DEQ:
+	str_lex = "DEQ";
+	break;
+case LEX_TSLASH:
+	str_lex = "TSLASH";
+	break;
+case LEX_SLASHT:
+	str_lex = "SLASHT";
+	break;
+case LEX_PERCENT:
+	str_lex = "PERCENT";
+	break;
+case LEX_BEGIN:
+	str_lex = "BEGIN";
+	break;
+case LEX_END:
+	str_lex = "END";
+	break;
+case LEX_QUOTE:
+	str_lex = "QUOTE";
+	break;
+case LEX_ID:
+	str_lex = "ID";
+	break;
+case LEX_NUM:
+	str_lex = "NUM";
+	break;
+case POLIZ_LABEL:
+	str_lex = "POLIZ_LABEL";
+	break;
+case POLIZ_ADDRESS:
+	str_lex = "POLIZ_ADDRESS";
+	break;
+case POLIZ_GO:
+	str_lex = "POLIZ_GO";
+	break;
+case POLIZ_FG:
+	str_lex = "POLIZ_FG";
+	break;

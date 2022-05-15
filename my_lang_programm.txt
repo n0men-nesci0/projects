@@ -1,10 +1,21 @@
 program {
-	int x;
-	string s1, s2 = "Hello World!";
+	int x = 1, y;
+    string s1 = "hello", s2 = "world";
 	boolean b1 = true, b2 = false;
-	while (x) {
-		write(x);
+	while (x > 0) {
+		if (y + 2  > 0)
+			x = x + 2;
+		 else
+			y = y % 3; 
 		read(x);
+		label1:	
+		read(y);
+		goto label1;
+		write(x, y + 5);
+		x + y + 7 - 12 / x % y;
 	}
+	label2:
+	write(x);
+	if (x == y)
+		x = x + 1;
 }
-	
