@@ -18,7 +18,7 @@ enum type_of_lex {
     LEX_DEQ, LEX_TSLASH, LEX_SLASHT, LEX_PERCENT, LEX_BEGIN, LEX_END, 
 
     LEX_QUOTE, LEX_ID, LEX_NUM, POLIZ_LABEL, 
-    POLIZ_ADDRESS, POLIZ_GO, POLIZ_FGO 
+    POLIZ_ADDRESS, POLIZ_GO, POLIZ_FGO, POLIZ_DROP 
 };
 
 
@@ -169,6 +169,9 @@ public:
         case POLIZ_FGO:
             str_lex = "POLIZ_FGO";
             break;
+        case POLIZ_DROP:
+            str_lex = "POLIZ_DROP";
+            break;
         }
     }
 
@@ -236,17 +239,15 @@ public:
     void put_bool_value(bool v) { bool_value = v; }
 
     friend ostream& operator<<(ostream& os, Ident id) {
-        if (id.declare) {
-            os << id.name << ' ' << Lex(id.type).get_string_value();
-            if (id.assign) {
-                os << ' ';
-                if (id.type == LEX_INT)
-                    os << id.int_value;
-                else if (id.type == LEX_STRING)
-                    os << id.str_value;
-                else 
-                    os << id.bool_value;
-            }
+        os << id.name << ' ' << Lex(id.type).get_string_value();
+        if (id.assign) {
+            os << ' ';
+            if (id.type == LEX_INT)
+                os << id.int_value;
+            else if (id.type == LEX_STRING)
+                os << id.str_value;
+            else 
+                os << id.bool_value;
         } 
         return os;
     }
@@ -280,8 +281,8 @@ class Scanner {
 public:
     static const char * TW [], * TD [];
     Scanner(const char * program) {
-        if (!(fp = fopen (program, "r" ))) 
-            throw  "can’t open file" ;
+        if (!(fp = fopen(program, "r"))) 
+            throw  "can’t open file";
     }
     Lex get_lex();
 };
@@ -466,15 +467,16 @@ void Parser::analyze () {
     P();
     if (c_type != LEX_FIN)
         throw curr_lex;
-    cout << "OK!" << endl;
+    cout << "syntax : OK!" << endl;
     cout << '\n' << "-----VARIABLES-----" << "\n\n";
-    for (int i = 0; i < TID.size(); ++i) {
-        cout << i << ' ' << TID[i] << endl;
+    for (unsigned i = 0; i < TID.size(); ++i) {
+        cout << i << ' ' << TID[i] << endl;;
     }
     cout << '\n' << "-----POLIZ-----" << "\n\n";
-    for (int i = 0; i < poliz.size(); ++i) {
+    for (unsigned i = 0; i < poliz.size(); ++i) {
         cout << i << ' ' << poliz[i] << endl;
     }
+    cout << endl;
     return;
 }
 
@@ -566,14 +568,17 @@ void Parser::O() {
         poliz.push_back(Lex(POLIZ_FGO));
         gl();
         O(); 
-        pl3 = poliz.size();
-        poliz.push_back(Lex());
-        poliz.push_back (Lex(POLIZ_GO));
-        poliz[pl2] = Lex(POLIZ_LABEL, poliz.size());
         if (c_type == LEX_ELSE) {
+            pl3 = poliz.size();
+            poliz.push_back(Lex());
+            poliz.push_back (Lex(POLIZ_GO));
+            poliz[pl2] = Lex(POLIZ_LABEL, poliz.size());
             gl(); 
             O();
             poliz[pl3] = Lex(POLIZ_LABEL, poliz.size());
+        }
+        else {
+            poliz[pl2] = Lex(POLIZ_LABEL, poliz.size());
         }
         return;
 
@@ -651,7 +656,7 @@ void Parser::O() {
         gl();
         return;
 
-    default: // operator - expression
+    default: 
         E();
         if (is_labeled_operator)  {
             is_labeled_operator = false;
@@ -659,6 +664,7 @@ void Parser::O() {
         }
         if (c_type != LEX_SEMICOLON)
             throw curr_lex;
+        poliz.push_back(Lex(POLIZ_DROP));
         gl();
         return;
     }
@@ -759,12 +765,22 @@ void Parser::E6() {
             c_type = curr_lex.get_type();
             c_val = curr_lex.get_value();
         }
+
     }
     else if (c_type == LEX_NUM) {
         st_lex.push(LEX_INT);
         poliz.push_back(curr_lex);
         gl();
     }
+    else if (c_type == LEX_MINUS || c_type == LEX_PLUS) {
+        bool minus_sign = c_type == LEX_MINUS; 
+        gl();
+        if (c_type != LEX_NUM)
+            throw "wrong expression";
+        st_lex.push(LEX_INT);
+        poliz.push_back(Lex(c_type, minus_sign ? -c_val : c_val));
+        gl();
+    } 
     else if (c_type == LEX_QUOTE) {
         st_lex.push(LEX_STRING);
         poliz.push_back(curr_lex);
@@ -802,9 +818,8 @@ void Parser::dec(type_of_lex type) {
     int i;
     while (!st_int.empty()) {
         from_st(st_int, i);
-        if (TID[i].get_declare()) {
-            throw "twice";
-        }
+        if (TID[i].get_declare()) 
+            throw TID[i].get_name() + ": declared twice";
         else {
             TID[i].put_declare();
             TID[i].put_type(type);
@@ -814,13 +829,25 @@ void Parser::dec(type_of_lex type) {
 }
 
 void Parser::check_init(type_of_lex type, int table_num) {
-    if (!(type == LEX_INT && c_type == LEX_NUM ||
-        type == LEX_STRING && c_type == LEX_QUOTE ||
-        type == LEX_BOOLEAN && (c_type == LEX_FALSE || c_type == LEX_TRUE)))
-        throw "initialization bad types";
+    bool minus_sign;
+    if (c_type == LEX_MINUS) {
+        minus_sign = true;
+        gl();
+    }
+    else {
+        minus_sign = false;
+        if (c_type == LEX_PLUS)
+            gl();
+    } 
+    if (minus_sign && c_type != LEX_NUM) 
+        throw TID[table_num].get_name() + ": wrong initialization"; 
+    if ( !( (type == LEX_INT && c_type == LEX_NUM) ||
+        (type == LEX_STRING && c_type == LEX_QUOTE) ||
+        (type == LEX_BOOLEAN && (c_type == LEX_FALSE || c_type == LEX_TRUE) ) ) )
+        throw TID[table_num].get_name() + ": initialization bad types";
     TID[table_num].put_assign();
     if (type == LEX_INT) 
-       TID[table_num].put_int_value(c_val);
+       TID[table_num].put_int_value(minus_sign ? -c_val : c_val);
     else if (type == LEX_STRING)
         TID[table_num].put_string_value(curr_lex.get_string_value());
     else if (c_type == LEX_FALSE)
@@ -835,14 +862,14 @@ void Parser::check_id() {
     if (TID[c_val].get_declare())
         st_lex.push (TID[c_val].get_type());
     else 
-        throw "not declared";
+        throw TID[c_val].get_name() + ": not declared";
 }
 
 void Parser::check_read() {
     if (!TID[c_val].get_declare())
-        throw "not declared";
+        throw TID[c_val].get_name() + ": not declared";
     if (TID[c_val].get_type() == LEX_BOOLEAN)
-        throw "boolean type variable in read()";
+        throw TID[c_val].get_name() + ": boolean type variable in read()";
 }
 
 void Parser::eq_bool () {
@@ -857,69 +884,369 @@ void Parser::check_op() {
     from_st(st_lex, op);
     from_st(st_lex, t1);
     if (t1 != t2)
-        throw "wrong types";
+        throw "wrong types in expression";
     if (op == LEX_PLUS) {
         if (t1 == LEX_BOOLEAN)
-            throw "wrong types";
+            throw "wrong types in expression";
         r = t1;
     }
     else if (op == LEX_MINUS || op == LEX_TIMES || 
              op == LEX_SLASH || op == LEX_PERCENT) 
     {
         if (t1 != LEX_INT)
-            throw "wrong types";
+            throw "wrong types in expression";
         r = LEX_INT;
     }
     else if (op == LEX_LSS || op == LEX_GTR || 
              op == LEX_NEQ || op == LEX_DEQ) 
     {
         if (t1 == LEX_BOOLEAN)
-            throw "wrong types";
+            throw "wrong types in expression";
         r = LEX_BOOLEAN;
     }
     else if (op == LEX_LEQ || op == LEX_GEQ) {
         if (t1 != LEX_INT)
-            throw "wrong types";
+            throw "wrong types in expression";
         r = LEX_BOOLEAN;
     }
     else if (op == LEX_OR || op == LEX_AND) {
         if (t1 != LEX_BOOLEAN)
-            throw "wrong types";
+            throw "wrong types in expression";
         r = LEX_BOOLEAN;
     }
     else if (op == LEX_EQ)
         r = t1;
     else
-        throw "wrong operation";
+        throw "wrong operation in expression";
     st_lex.push(r);
     poliz.push_back(Lex(op));
 }
 
 void Parser::check_not() {
     if (st_lex.top() != LEX_BOOLEAN)
-        throw "wrong types";
+        throw "wrong types in expression";
     poliz.push_back(Lex(LEX_NOT));
 }
 
+
+class Executer {
+    Lex get_value_from_var(Lex & l) {
+        switch(TID[l.get_value()].get_type()) {
+            case LEX_STRING:
+                return Lex(LEX_QUOTE, 0, TID[l.get_value()].get_string_value());
+            case LEX_INT:
+                return Lex(LEX_NUM, TID[l.get_value()].get_int_value());
+            case LEX_BOOLEAN:
+                return Lex(LEX_BOOLEAN, TID[l.get_value()].get_bool_value());
+            default:
+                ;
+        }
+        return Lex();
+    }
+public:
+    void execute(vector <Lex> & poliz);
+};
+
+
+
+void Executer::execute(vector <Lex> & poliz) {
+    Lex cur;
+    stack <Lex> args;
+    Lex op1, op2;
+    int size = poliz.size(), index = 0, i;
+    string s;
+    cout << "-----PROGRAM OUTPUT-----" << endl;
+    while (index < size) {
+        cur = poliz[index];
+        switch(cur.get_type()) {
+
+            case LEX_TRUE: case LEX_FALSE: case LEX_NUM: 
+            case LEX_QUOTE: case POLIZ_ADDRESS: case POLIZ_LABEL:
+                args.push(cur);
+                break;
+
+            case LEX_ID:
+                i = cur.get_value();
+                if (!TID[i].get_declare()) 
+                    throw TID[i].get_name() + ": variable is not initialized";
+                args.push(cur);
+                break;
+            
+            case LEX_NOT:
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                args.push(Lex(LEX_BOOLEAN, !op1.get_value()));
+                break;
+
+            case LEX_OR:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                args.push(Lex(LEX_BOOLEAN, op1.get_value() || op2.get_value()));
+                break;
+            
+            case LEX_AND:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                args.push(Lex(LEX_BOOLEAN, op1.get_value() && op2.get_value()));
+                break;
+
+            case POLIZ_GO:
+                from_st(args, op1);
+                index = op1.get_value() - 1;
+                break;
+            
+            case POLIZ_FGO:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (!op1.get_value())
+                    index = op2.get_value() - 1;
+                break;
+
+            case POLIZ_DROP:
+                args.pop();
+                break;
+
+            case LEX_WRITE:
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op1.get_type() == LEX_QUOTE)
+                    cout << op1.get_string_value();
+                else {
+                    cout << op1.get_value();
+                }
+                cout << endl;
+                break;
+
+            case LEX_READ:
+                from_st(args, op1);
+                i = op1.get_value();
+                switch(TID[i].get_type()) {
+                    case LEX_INT:
+                        int n;
+                        cin >> n;
+                        TID[i].put_int_value(n);
+                        break;
+                    case LEX_STRING:
+                        cin >> s;
+                        TID[i].put_string_value(s);
+                        break;
+                    case LEX_BOOLEAN:
+                        while (true) {
+                            cout << "Enter boolean value \"true\" or \"false\"\n";
+                            cin >> s;
+                            if (s != "true" && s != "false") {
+                                cout << "wrong input, try again\n";
+                                continue;
+                            }
+                            TID[i].put_bool_value(s == "true");
+                            break;
+                        }
+                        break;
+                    default:
+                        throw "read: wrong operand";
+                }
+                TID[i].put_assign();
+                break;
+
+            case LEX_PLUS:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                if (op1.get_type() == LEX_NUM)
+                    args.push(Lex(LEX_NUM, op1.get_value() + op2.get_value()));
+                else
+                    args.push(Lex(LEX_QUOTE, 0, op1.get_string_value() + op2.get_string_value()));
+                break;
+            
+            case LEX_MINUS:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                args.push(Lex(LEX_NUM, op1.get_value() - op2.get_value()));
+                break;
+            
+            case LEX_TIMES:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                args.push(Lex(LEX_NUM, op1.get_value() * op2.get_value()));
+                break;
+
+            case LEX_SLASH:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                if (!op2.get_value())
+                    throw "division by zero";
+                args.push(Lex(LEX_NUM, op1.get_value() / op2.get_value()));
+                break;
+
+            case LEX_PERCENT:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                if (!op2.get_value())
+                    throw "division by zero";
+                args.push(Lex(LEX_NUM, op1.get_value() % op2.get_value()));
+                break;
+
+            case LEX_DEQ:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                if (op1.get_type() == LEX_INT)
+                    args.push(Lex(LEX_BOOLEAN, op1.get_value() == op2.get_value()));
+                else
+                    args.push(Lex(LEX_BOOLEAN, op1.get_string_value() == op2.get_string_value()));
+                break;
+
+            case LEX_EQ:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                if (op1.get_type() != LEX_ID)
+                    throw "wrong left side of equation";
+                switch (op2.get_type()) {
+                    case LEX_NUM:
+                        TID[op1.get_value()].put_int_value(op2.get_value());
+                        break;
+                    case LEX_QUOTE:
+                        TID[op1.get_value()].put_string_value(op2.get_string_value());
+                        break;
+                    case LEX_BOOLEAN:
+                        TID[op1.get_value()].put_bool_value(op2.get_value());
+                        break;
+                    default:
+                        throw "EQ: wrong operands";
+                }
+                args.push(op2);
+                break;
+
+            case LEX_LSS:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                args.push(Lex(LEX_BOOLEAN, op1.get_value() < op2.get_value()));
+                break;
+
+            case LEX_GTR:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                args.push(Lex(LEX_BOOLEAN, op1.get_value() > op2.get_value()));
+                break;
+
+            case LEX_LEQ:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                args.push(Lex(LEX_BOOLEAN, op1.get_value() <= op2.get_value()));
+                break;
+
+            case LEX_GEQ:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                args.push(Lex(LEX_BOOLEAN, op1.get_value() >= op2.get_value()));
+                break;
+
+            case LEX_NEQ:
+                from_st(args, op2);
+                from_st(args, op1);
+                if (op1.get_type() == LEX_ID)
+                    op1 = get_value_from_var(op1);
+                if (op2.get_type() == LEX_ID)
+                    op2 = get_value_from_var(op2);
+                if (op1.get_type() == LEX_NUM)
+                    args.push(Lex(LEX_BOOLEAN, op1.get_value() != op2.get_value()));
+                else 
+                    args.push(Lex(LEX_BOOLEAN, op1.get_string_value() != op2.get_string_value()));
+                break;
+
+            case LEX_GOTO:
+                from_st(args, op1);
+                index = TID[op1.get_value()].get_int_value() - 1;
+                break;
+
+            default:
+                cout << poliz[index] << ' ';
+                throw "unexpected poliz element";
+        }
+        ++index;       
+    }
+    cout << "-----DONE-----\n";
+}
+
+class Interpretator {
+    Parser P;
+    Executer E;
+public:
+    Interpretator(const char* program): P(program) {}
+    void interpretation() {
+        P.analyze();
+        E.execute(P.poliz);
+    }
+};
+
 int main(int argc, char * argv[]) {
 	try {
-		if (argc == 1){
-			Parser p("my_lang_programm.txt");
-			p.analyze();
-		}
-        else {
-			throw "Can't find filename in argv[]";
-		}
+        const char * fname = "my_lang_program.txt";
+		if (argc > 1) {
+            fname = argv[1];
+        }
+        Interpretator I(fname);
+        I.interpretation();
 	}
-    catch(Lex l) {
-        cout << "Error on lexem\n" << l << endl;  
-    }
 	catch(char c){
         cout << "Error on symbol " << c;
 		return 1;
 	}
-	catch(const char * msg) {
-        cout << msg << endl;
+    catch(Lex l) {
+        cout << "Error on lexem\n" << l << endl;  
+    }
+    catch(string msg) {
+        cout << msg;
         return 1;
     }
 	return 0;
