@@ -133,6 +133,6 @@ case POLIZ_ADDRESS:
 case POLIZ_GO:
 	str_lex = "POLIZ_GO";
 	break;
-case POLIZ_FG:
-	str_lex = "POLIZ_FG";
+case POLIZ_FGO:
+	str_lex = "POLIZ_FGO";
 	break;
