@@ -165,7 +165,7 @@ void invitation() {
   cout << "1. Add string to text" << endl;
   cout << "2. Access to string by index" << endl;
   cout << "3. Connect two texts" << endl;
-  cout << "4. Create an intersection of two texts" << endl;
+  cout << "4. Create a union of two texts" << endl;
   cout << "5. Print string by index" << endl;
   cout << "6. Print whole text" << endl;
   cout << "7. End session" << endl << '>';
@@ -207,7 +207,7 @@ int main() {
         break;
       } 
       case 4 : {
-        cout << "Enter two text numbers which you want to intersect and then text number where to put the result" << endl << '>';
+        cout << "Enter two text numbers which you want to merge and then text number where to put the result" << endl << '>';
         int n1, n2, n3;
         cin >> n1 >> n2 >> n3;
         txt_arr[n3] = txt_arr[n1].merge_with_no_repeats(txt_arr[n2]); 
